@@ -1,0 +1,30 @@
+{
+  "name": "@cadolabs/gbot",
+  "version": "2.1.2",
+  "bin": "gbot",
+  "repository": "https://github.com/Cado-Labs/gbot",
+  "author": "Aleksei Bespalov <nulldefiner@gmail.com>",
+  "homepage": "https://github.com/Cado-Labs/gbot",
+  "license": "MIT",
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "lodash": "^4.17.21",
+    "minimatch": "^5.1.0",
+    "winston": "^3.3.3",
+    "yargs": "^17.3.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.14.6",
+    "@babel/eslint-parser": "^7.16.3",
+    "eslint": "^8.4.1",
+    "eslint-config-umbrellio": "^5.0.1",
+    "eslint-plugin-import": "^2.25.3",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-prefer-object-spread": "^1.2.1",
+    "eslint-plugin-promise": "^5.2.0"
+  }
+}

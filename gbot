@@ -1,0 +1,31 @@
+#!/usr/bin/env node
+
+const yargs = require("yargs")
+
+const pkg = require("./package")
+const configUtils = require("./utils/config")
+
+const Unapproved = require("./tasks/Unapproved")
+
+const runCommand = Klass => argv => {
+  const config = configUtils.load(argv.config)
+  return new Klass(config).perform()
+}
+
+yargs // eslint-disable-line no-unused-expressions
+  .command(
+    "unapproved", "sends unapproved requests to Mattermost / Slack", {}, runCommand(Unapproved),
+  )
+  .demandCommand(1, "must provide a valid command")
+  .options({
+    config: {
+      alias: "c",
+      describe: "path to config file",
+      default: "./gbot.yml",
+      type: "string",
+    },
+  })
+  .version(pkg.version)
+  .help()
+  .strict()
+  .argv

@@ -1,0 +1,41 @@
+messenger:
+  url: https://slack.com/api/chat.postMessage
+  token: "<TOKEN>"
+  channel: "<CHANNEL>"
+  markup: slack
+  sender:
+    username: "@ubmrellio/gbot"
+    icon: "<icon url>"
+  slack:
+    usernameMapping:
+      pavel: U020DSB741G
+gitlab:
+  token: "<TOKEN>"
+  url: "<gitlab api url>"
+  projects:
+  - id: 42
+  - id: 43
+  - id: 44
+  groups:
+  - id: 4
+    excluded: [1, 2, 3]
+  - id: 5
+    excluded: [11, 12]
+  - id: 6
+
+# tasks config
+unapproved:
+  emoji:
+    24h: ":emoji1:"
+    12h: ":emoji2:"
+    default: ":emoji3:"
+  tag:
+    approvers: false
+    author: false
+    commenters: false
+    onThreadsOpen: false
+    onConflict: false
+  diffs: false
+  splitByReviewProgress: false
+  requestsPerMessage: 15
+  checkConflicts: false
