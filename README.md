@@ -44,11 +44,12 @@ messenger:
   markup: "slack"                      # Messenger markup (default - "markdown").
                                        # Possible values:
                                        # - "markdown" (for Mattermost)
-                                       # - "slack" (for Slack)
+                                       # - "slack" (for Slack blocks markup)
+                                       # - "slackText" (for Slack text markup)
   sender:
-    username: "@cadolabs/gbot"        # Sender's display name
+    username: "@cadolabs/gbot"         # Sender's display name
     icon: "<icon url>"                 # Sender's icon url
-  slack:
+  slack:                               # Or slackText for slackText
     usernameMapping:
       pavel: "U020DSB741G"             # Mapping of Gitlab username to Slack ID
 gitlab:
