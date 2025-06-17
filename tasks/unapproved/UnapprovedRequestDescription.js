@@ -20,8 +20,9 @@ class UnapprovedRequestDescription {
 
     const { author } = this.request
 
+    const sanitizedTitle = stringUtils.sanitizeString(this.request.title)
     const reaction = this.__getEmoji(new Date(this.request.updated_at))
-    const link = markup.makeLink(this.request.title, this.request.web_url)
+    const link = markup.makeLink(sanitizedTitle, this.request.web_url)
     const projectLink = markup.makeLink(this.request.project.name, this.request.project.web_url)
     const unresolvedAuthors = this.__unresolvedAuthorsString(markup)
     const tagAuthorOnThread = tagOnThreadsOpen && unresolvedAuthors.length > 0
