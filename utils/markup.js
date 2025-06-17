@@ -2,7 +2,7 @@ const _ = require("lodash")
 
 const markdown = {
   type: "markdown",
-  makeLink: (title, url) => `[${title}](${url})`,
+  makeLink: (title, url) => `[${sanitizeStringForMattermost(title)}](${url})`,
   makeText: text => text,
   makePrimaryInfo: info => info,
   makeAdditionalInfo: parts => parts.join("\n"),
@@ -18,7 +18,7 @@ const markdown = {
 
 const slackText = {
   type: "slackText",
-  makeLink: (title, url) => `<${url}|${title}>`,
+  makeLink: (title, url) => `<${url}|${sanitizeStringForSlack(title)}>`,
   makeText: text => text,
   makePrimaryInfo: info => info,
   makeAdditionalInfo: parts => parts.join("\n"),
@@ -36,7 +36,7 @@ const slackText = {
 
 const slack = {
   type: "slack",
-  makeLink: (title, url) => `<${url}|${title}>`,
+  makeLink: (title, url) => `<${url}|${sanitizeStringForSlack(title)}>`,
   makePrimaryInfo: info => ({
     type: "section",
     text: info,
@@ -69,6 +69,14 @@ const slack = {
   ]),
   composeBody: (main, secondary) => _.compact([main, secondary]),
   composeMsg: body => ({ blocks: _.castArray(body) }),
+}
+
+const sanitizeStringForSlack = (string) => {
+  return string.replace(/[<>&|@#`]/g, "");
+}
+
+const sanitizeStringForMattermost = (string) => {
+  return string.replace(/[|@#`]/g, "");
 }
 
 module.exports = { slack, slackText, markdown }
