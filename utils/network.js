@@ -18,6 +18,12 @@ axios.interceptors.request.use(request => {
   return request
 })
 
+const makeResult = response => {
+  const data = response.data
+  data.headers = response.headers
+  return data
+}
+
 const handleError = (url, error) => {
   const status = error.response?.status || 500
   const response = error.response?.data || error.message
@@ -32,18 +38,17 @@ const getErrorMessage = ({ url, status, response }) => {
 
 const get = async (url, params = {}, headers = {}) => {
   try {
-    const resp = await axios.get(url, { headers })
-    return resp.data
+    const response = await axios.get(url, { params, headers })
+    return makeResult(response)
   } catch (error) {
     handleError(url, error)
   }
 }
 
 const post = async (url, params, headers = {}) => {
-
   try {
-    const resp = await axios.post(url, params, { headers })
-    return resp.data
+    const response = await axios.post(url, params, { headers })
+    return makeResult(response)
   } catch (error) {
     handleError(url, error)
   }

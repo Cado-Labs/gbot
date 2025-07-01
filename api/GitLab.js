@@ -52,8 +52,7 @@ class GitLab {
 
   __getPaginated = (uri, query = {}) => {
     return this.__get(uri, query).then(async results => {
-      const { headers } = results
-      const totalPages = parseInt(headers["x-total-pages"], 10) || 1
+      const totalPages = parseInt(results.headers["x-total-pages"], 10) || 1
 
       let page = 1
       let allResults = results
