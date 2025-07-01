@@ -1,6 +1,6 @@
 {
   "name": "@cadolabs/gbot",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "bin": "gbot",
   "repository": "https://github.com/Cado-Labs/gbot",
   "author": "Aleksei Bespalov <nulldefiner@gmail.com>",
@@ -11,6 +11,7 @@
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
+    "axios": "^1.10.0",
     "js-yaml": "^4.1.0",
     "lodash": "^4.17.21",
     "minimatch": "^5.1.0",
