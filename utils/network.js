@@ -33,7 +33,7 @@ const handleError = (url, error) => {
 
 const getErrorMessage = ({ url, status, response }) => {
   const message = response || `${status} Network Error`
-  return `Got '${message}' message for '${url}' request`
+  return `Got '${JSON.stringify(message)}' message for '${url}' request`
 }
 
 const get = async (url, params = {}, headers = {}) => {
