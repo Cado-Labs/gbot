@@ -33,9 +33,11 @@ class GitLab {
     return this.__getPaginated(uri, query)
   }
 
-  groupProjects = group => {
+  groupProjects = (group, { withShared }) => {
     const uri = this.__getUrl("groups", group, "projects")
-    return this.__getPaginated(uri)
+    const query = { with_shared: withShared }
+
+    return this.__getPaginated(uri, query)
       .then(projects => projects.map(project => project.id))
   }
 

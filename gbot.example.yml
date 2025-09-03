@@ -18,10 +18,10 @@ gitlab:
   - id: 44
   groups:
   - id: 4
-    excluded: [1, 2, 3]
   - id: 5
-    excluded: [11, 12]
+    excluded: [1, 2, 3]
   - id: 6
+    withShared: false
 
 # tasks config
 unapproved:

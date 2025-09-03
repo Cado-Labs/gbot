@@ -57,8 +57,10 @@ gitlab:
   url: "<gitlab api url>"              # Gitlab API base url
   groups:                              # List of your project’s groups (optional if projects are defined)
   - id: 4                              # Group id
-    excluded: [1, 2, 3]                # List of projects to exclude from the current group projects (optional)
   - id: 5
+    excluded: [1, 2, 3]                # List of projects to exclude from the current group projects (optional)
+  - id: 6
+    withShared: false                  # Whether to include shared projects or not, defaults to true
   projects:                            # List of your project (optional if groups are defined)
   - id: 42                             # Project id
     paths:                             # List of paths that should be changed in merge requests

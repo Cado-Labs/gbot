@@ -27,8 +27,8 @@ class BaseCommand {
 
     if (_.isEmpty(groups)) return Promise.resolve(configProjects)
 
-    const promises = groups.map(({ id, excluded = [] }) => (
-      this.gitlab.groupProjects(id).then(groupProjects => (
+    const promises = groups.map(({ id, withShared = true, excluded = [] }) => (
+      this.gitlab.groupProjects(id, { withShared }).then(groupProjects => (
         groupProjects.filter(p => !excluded.includes(p))
       ))
     ))
