@@ -148,7 +148,6 @@ class Unapproved extends BaseCommand {
     .then(requests => requests.filter(req => {
       const isCompleted = !req.work_in_progress
       const isUnapproved = req.approvals_left > 0
-      console.log(req)
       const hasPathsChanges = this.__hasPathsChanges(req.changes, project.paths)
       const isApplicable = isUnapproved || this.__isRequestUnderReview(req) || 
         this.__hasConflicts(req) || this.__hasFailedPipeline(req)
