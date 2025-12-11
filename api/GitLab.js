@@ -48,6 +48,13 @@ class GitLab {
     return this.__getPaginated(uri, query)
   }
 
+  pipelines = (project, request) => {
+    const query = { page: 1, per_page: 1 }
+    const uri = this.__getUrl("projects", project, "merge_requests", request, "pipelines")
+
+    return this.__get(uri, query)
+  }
+
   __getUrl = (...parts) => url.build(this.baseUrl, ...parts)
 
   __get = (url, query = {}) => network.get(url, query, { "Private-Token": this.token })

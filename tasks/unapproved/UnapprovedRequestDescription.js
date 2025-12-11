@@ -12,11 +12,7 @@ class UnapprovedRequestDescription {
   }
 
   build = () => {
-    const markup = markupUtils[this.config.messenger.markup]
-    const tagAuthor = this.__getConfigSetting("unapproved.tag.author", false)
-    const tagOnThreadsOpen = this.__getConfigSetting("unapproved.tag.onThreadsOpen", false)
-    const tagOnConflict = this.__getConfigSetting("unapproved.tag.onConflict", false)
-    const checkConflicts = this.__getConfigSetting("unapproved.checkConflicts", false)
+    const markup = this.__markup()
 
     const { author } = this.request
 
@@ -24,36 +20,30 @@ class UnapprovedRequestDescription {
     const link = markup.makeLink(this.request.title, this.request.web_url)
     const projectLink = markup.makeLink(this.request.project.name, this.request.project.web_url)
     const unresolvedAuthors = this.__unresolvedAuthorsString(markup)
-    const tagAuthorOnThread = tagOnThreadsOpen && unresolvedAuthors.length > 0
-    const tagAuthorInPrimaryMessage = this.type === "conflicts"
-      ? tagOnConflict
-      : tagAuthor || tagAuthorOnThread
     const authorString = this.__authorString(
-      markup, author.username, { tag: tagAuthorInPrimaryMessage },
+      markup, author.username, { tag: this.__tagAuthorInPrimaryMessage() },
     )
     const approvedBy = this.__approvedByString(markup)
-    const optionalDiff = this.__optionalDiffString()
-    const hasConflicts = this.__hasConflicts()
 
     const requestMessageParts = [
       reaction,
       markup.makeBold(link),
       `(${projectLink})`,
-      optionalDiff,
+      this.__optionalDiffString(),
       `by ${authorString}`,
     ]
     const requestMessageText = _.compact(requestMessageParts).join(" ")
     const primaryMessage = markup.makePrimaryInfo(
       markup.makeText(
         requestMessageText,
-        { withMentions: this.type === "conflicts" && tagOnConflict },
+        { withMentions: this.type === "conflicts" && this.__tagOnConflict() },
       ),
     )
     const secondaryMessageParts = []
 
     if (unresolvedAuthors.length > 0) {
       const text = `unresolved threads by: ${unresolvedAuthors}`
-      const msg = markup.makeText(text, { withMentions: tagOnThreadsOpen })
+      const msg = markup.makeText(text, { withMentions: this.__tagOnThreadsOpen() })
 
       secondaryMessageParts.push(msg)
     }
@@ -65,19 +55,29 @@ class UnapprovedRequestDescription {
       secondaryMessageParts.push(msg)
     }
 
-    if (checkConflicts && hasConflicts) {
-      const authorString = this.__authorString(markup, author.username, { tag: tagOnConflict })
+    if (this.__hasConflicts()) {
+      const authorString = this.__authorString(markup, author.username, { tag: this.__tagOnConflict() })
       const text = `conflicts: ${authorString}`
-      const msg = markup.makeText(text, { withMentions: tagOnConflict })
+      const msg = markup.makeText(text, { withMentions: this.__tagOnConflict() })
+
+      secondaryMessageParts.push(msg)
+    }
+
+    if (this.__isPipelineFailed()) {
+      const authorString = this.__authorString(markup, author.username, { tag: this.__tagOnFailedPipeline() })
+      const text = `pipeline failed: ${authorString}`
+      const msg = markup.makeText(text, { withMentions: this.__tagOnFailedPipeline() })
 
       secondaryMessageParts.push(msg)
     }
 
     const secondaryMessage = markup.makeAdditionalInfo(
-      this.type === "conflicts" ? [] : secondaryMessageParts,
+      this.type === "conflicts" || this.type === "pipeline_failed" ? [] : secondaryMessageParts,
     )
     return markup.composeBody(primaryMessage, secondaryMessage)
   }
+
+  __markup = () => markupUtils[this.config.messenger.markup]
 
   __getConfigSetting = (settingName, defaultValue = null) => {
     return _.get(this.config, settingName, defaultValue)
@@ -98,7 +98,7 @@ class UnapprovedRequestDescription {
     return findEmoji(emoji) || emoji.default || ""
   }
 
-  __unresolvedAuthorsString = markup => {
+  __unresolvedAuthorsString = (markup) => {
     return this.__unresolvedAuthorsFor(this.request).map(author => (
       this.__authorString(markup, author.username, { tag: true })
     )).join(", ")
@@ -180,7 +180,32 @@ class UnapprovedRequestDescription {
     )(changes)
   }
 
-  __hasConflicts = () => this.request.has_conflicts
+  __hasConflicts = () => this.__getConfigSetting("unapproved.checkConflicts", false) && this.request.has_conflicts
+
+  __isPipelineFailed = () => this.__getConfigSetting("unapproved.checkPipeline", false) && 
+    this.request.pipelines[0].status == "failed"
+
+  __tagAuthorInPrimaryMessage = () => {
+    const unresolvedAuthors = this.__unresolvedAuthorsString(this.__markup())
+    const tagAuthorOnThread = this.__tagOnThreadsOpen() && unresolvedAuthors.length > 0
+
+    switch (this.type) {
+      case "conflicts":
+        return this.__tagOnConflict()
+      case "pipeline_failed":
+        return this.__tagOnFailedPipeline()
+      default:
+        return this.__shouldTag("author") || tagAuthorOnThread
+    }
+  }
+
+  __shouldTag = setting => this.__getConfigSetting("unapproved.tag." + setting, false)
+
+  __tagOnConflict = () => this.__shouldTag("onConflict")
+
+  __tagOnFailedPipeline = () => this.__shouldTag("onFailedPipeline")
+
+  __tagOnThreadsOpen = () => this.__shouldTag("onThreadsOpen")
 }
 
 module.exports = UnapprovedRequestDescription
