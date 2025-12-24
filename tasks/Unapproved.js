@@ -84,17 +84,17 @@ class Unapproved extends BaseCommand {
 
   __buildByReviewProgressMessages = (requests, markup) => {
     const messages = []
-    const [toReviewRequests, underReviewRequests, reviewedWithConflicts] = _.values(
+    const [toReviewRequests, underReviewRequests, reviewedWithConflicts, reviewedWithFailedPipeline] = _.values(
       _.groupBy(requests, req => {
-        const isUnderReview = this.__isRequestUnderReview(req)
-
         switch (true) {
-          case req.approvals_left > 0 && !isUnderReview:
+          case req.approvals_left > 0 && !this.__isRequestUnderReview(req):
             return 0 // To review
-          case isUnderReview:
+          case this.__isRequestUnderReview(req):
             return 1 // Under review
-          default:
+          case this.__hasConflicts(req):
             return 2 // Reviewed with conflicts
+          default:
+            return 3 // Reviewed with failed pipeline
         }
       }),
     )
@@ -109,6 +109,7 @@ class Unapproved extends BaseCommand {
       { type: "unapproved", name: "Unapproved", requests: toReviewRequests },
       { type: "under_review", name: "Under review", requests: underReviewRequests },
       { type: "conflicts", name: "With conflicts", requests: reviewedWithConflicts },
+      { type: "pipeline_failed", name: "With failed pipeline", requests: reviewedWithFailedPipeline },
     ]
 
     sections.forEach(settings => {
@@ -147,13 +148,9 @@ class Unapproved extends BaseCommand {
     .then(requests => requests.filter(req => {
       const isCompleted = !req.work_in_progress
       const isUnapproved = req.approvals_left > 0
-      const isUnderReview = this.__isRequestUnderReview(req)
       const hasPathsChanges = this.__hasPathsChanges(req.changes, project.paths)
-      const checkConflicts = this.__getConfigSetting("unapproved.checkConflicts", false)
-      const hasConflicts = req.has_conflicts
-      const isApplicable = checkConflicts
-        ? isUnapproved || isUnderReview || hasConflicts
-        : isUnapproved || isUnderReview
+      const isApplicable = isUnapproved || this.__isRequestUnderReview(req) || 
+        this.__hasConflicts(req) || this.__hasFailedPipeline(req)
 
       return isCompleted && hasPathsChanges && isApplicable
     }))
@@ -174,6 +171,11 @@ class Unapproved extends BaseCommand {
     ))
   }
 
+  __hasConflicts = req => this.__getConfigSetting("unapproved.checkConflicts", false) && req.has_conflicts
+
+  __hasFailedPipeline = req => this.__getConfigSetting("unapproved.checkPipeline", false) && 
+    req.pipelines[0].status == "failed"
+
   __getExtendedRequests = projectId => {
     return this.gitlab
       .project(projectId)
@@ -186,23 +188,12 @@ class Unapproved extends BaseCommand {
       )
   }
 
-  __getExtendedRequest = (project, request) => Promise.resolve(request)
-    .then(req => this.__appendApprovals(project, req))
-    .then(req => this.__appendChanges(project, req))
-    .then(req => this.__appendDiscussions(project, req))
+  __getExtendedRequest = (project, request) => ["approvals", "changes", "discussions", "pipelines"]
+    .reduce((prev, field) => prev.then(req => this.__append(field)(project, req)), Promise.resolve(request)) 
     .then(req => ({ ...req, project }))
 
-  __appendApprovals = (project, request) => this.gitlab
-    .approvals(project.id, request.iid)
-    .then(approvals => ({ ...approvals, ...request }))
-
-  __appendChanges = (project, request) => this.gitlab
-    .changes(project.id, request.iid)
-    .then(changes => ({ ...changes, ...request }))
-
-  __appendDiscussions = (project, request) => this.gitlab
-    .discussions(project.id, request.iid)
-    .then(discussions => ({ ...request, discussions }))
+  __append = field => (project, request) => this.gitlab[field](project.id, request.iid)
+    .then(result => (result instanceof Array ? ({ [field]: result, ...request }) : ({ ...result, ...request })))
 
   __getConfigSetting = (settingName, defaultValue = null) => {
     return _.get(this.config, settingName, defaultValue)
