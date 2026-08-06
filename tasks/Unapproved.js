@@ -6,9 +6,12 @@ const UnapprovedRequestDescription = require("./unapproved/UnapprovedRequestDesc
 
 const logger = require("../utils/logger")
 const markupUtils = require("../utils/markup")
+const userUtils = require("../utils/users")
 const { NetworkError } = require("../utils/errors")
 
 class Unapproved extends BaseCommand {
+  __userNames = new Map()
+
   perform = () => {
     return this.projects
       .then(projects => Promise.all(projects.map(this.__getApplicableRequests)))
@@ -200,7 +203,52 @@ class Unapproved extends BaseCommand {
       (prev, field) => prev.then(req => this.__append(field)(project, req)),
       Promise.resolve(request),
     )
+    .then(this.__resolveUserNames)
     .then(req => ({ ...req, project }))
+
+  // GitLab hides the name of access token bots in embedded user objects, so look
+  // the real one up per user. Cached, and only for users we got no name for.
+  __resolveUserNames = request => this.__fetchMissingNames(request).then(names => {
+    if (names.size === 0) return request
+
+    const patch = user => (user && names.has(user.id)
+      ? { ...user, name: names.get(user.id) }
+      : user)
+
+    return {
+      ...request,
+      author: patch(request.author),
+      approved_by: (request.approved_by || []).map(approve => (
+        { ...approve, user: patch(approve.user) }
+      )),
+      discussions: (request.discussions || []).map(dis => (
+        { ...dis, notes: dis.notes.map(note => ({ ...note, author: patch(note.author) })) }
+      )),
+    }
+  })
+
+  __fetchMissingNames = request => {
+    const users = _.uniqBy(this.__usersWithoutName(request), user => user.id)
+    const names = new Map()
+
+    return Promise.all(users.map(user => this.__fetchUserName(user.id).then(name => {
+      if (userUtils.hasName({ name })) names.set(user.id, name)
+    }))).then(() => names)
+  }
+
+  __usersWithoutName = request => [
+    request.author,
+    ...(request.approved_by || []).map(approve => approve.user),
+    ...(request.discussions || []).flatMap(dis => dis.notes.map(note => note.author)),
+  ].filter(user => user && !userUtils.hasName(user))
+
+  __fetchUserName = id => {
+    if (!this.__userNames.has(id)) {
+      this.__userNames.set(id, this.gitlab.user(id).then(user => user.name).catch(() => null))
+    }
+
+    return this.__userNames.get(id)
+  }
 
   __append = field => (project, request) => this.gitlab[field](project.id, request.iid)
     .then(result => (result instanceof Array
