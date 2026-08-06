@@ -20,6 +20,8 @@ class GitLab {
 
   project = id => this.__get(this.__getUrl("projects", id))
 
+  user = id => this.__get(this.__getUrl("users", id))
+
   requests = project => {
     const query = {
       sort: "asc",
