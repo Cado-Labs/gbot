@@ -65,7 +65,9 @@ class UnapprovedRequestDescription {
     }
 
     if (this.__isPipelineFailed()) {
-      const authorString = this.__authorString(markup, author, { tag: this.__tagOnFailedPipeline() })
+      const authorString = this.__authorString(
+        markup, author, { tag: this.__tagOnFailedPipeline() },
+      )
       const text = `pipeline failed: ${authorString}`
       const msg = markup.makeText(text, { withMentions: this.__tagOnFailedPipeline() })
 
@@ -99,7 +101,7 @@ class UnapprovedRequestDescription {
     return findEmoji(emoji) || emoji.default || ""
   }
 
-  __unresolvedAuthorsString = (markup) => {
+  __unresolvedAuthorsString = markup => {
     return this.__unresolvedAuthorsFor(this.request).map(author => (
       this.__authorString(markup, author, { tag: true })
     )).join(", ")
@@ -181,10 +183,11 @@ class UnapprovedRequestDescription {
     )(changes)
   }
 
-  __hasConflicts = () => this.__getConfigSetting("unapproved.checkConflicts", false) && this.request.has_conflicts
+  __hasConflicts = () => this.__getConfigSetting("unapproved.checkConflicts", false) &&
+    this.request.has_conflicts
 
-  __isPipelineFailed = () => this.__getConfigSetting("unapproved.checkPipeline", false) && 
-    this.request.pipelines[0].status == "failed"
+  __isPipelineFailed = () => this.__getConfigSetting("unapproved.checkPipeline", false) &&
+    this.request.pipelines[0].status == "failed" // eslint-disable-line eqeqeq
 
   __tagAuthorInPrimaryMessage = () => {
     const unresolvedAuthors = this.__unresolvedAuthorsString(this.__markup())
@@ -200,7 +203,7 @@ class UnapprovedRequestDescription {
     }
   }
 
-  __shouldTag = setting => this.__getConfigSetting("unapproved.tag." + setting, false)
+  __shouldTag = setting => this.__getConfigSetting(`unapproved.tag.${setting}`, false)
 
   __tagOnConflict = () => this.__shouldTag("onConflict")
 
