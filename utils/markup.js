@@ -73,12 +73,12 @@ const slack = {
   composeMsg: body => ({ blocks: _.castArray(body) }),
 }
 
-const sanitizeStringForSlack = (string) => {
-  return string.replace(/[<>&|@#`]/g, "");
+const sanitizeStringForSlack = string => {
+  return string.replace(/[<>&|@#`]/g, "")
 }
 
-const sanitizeStringForMattermost = (string) => {
-  return string.replace(/[|@#`]/g, "");
+const sanitizeStringForMattermost = string => {
+  return string.replace(/[|@#`]/g, "")
 }
 
 module.exports = { slack, slackText, markdown }

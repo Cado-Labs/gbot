@@ -84,7 +84,9 @@ class Unapproved extends BaseCommand {
 
   __buildByReviewProgressMessages = (requests, markup) => {
     const messages = []
-    const [toReviewRequests, underReviewRequests, reviewedWithConflicts, reviewedWithFailedPipeline] = _.values(
+    const [
+      toReviewRequests, underReviewRequests, reviewedWithConflicts, reviewedWithFailedPipeline,
+    ] = _.values(
       _.groupBy(requests, req => {
         switch (true) {
           case req.approvals_left > 0 && !this.__isRequestUnderReview(req):
@@ -109,7 +111,11 @@ class Unapproved extends BaseCommand {
       { type: "unapproved", name: "Unapproved", requests: toReviewRequests },
       { type: "under_review", name: "Under review", requests: underReviewRequests },
       { type: "conflicts", name: "With conflicts", requests: reviewedWithConflicts },
-      { type: "pipeline_failed", name: "With failed pipeline", requests: reviewedWithFailedPipeline },
+      {
+        type: "pipeline_failed",
+        name: "With failed pipeline",
+        requests: reviewedWithFailedPipeline,
+      },
     ]
 
     sections.forEach(settings => {
@@ -149,7 +155,7 @@ class Unapproved extends BaseCommand {
       const isCompleted = !req.work_in_progress
       const isUnapproved = req.approvals_left > 0
       const hasPathsChanges = this.__hasPathsChanges(req.changes, project.paths)
-      const isApplicable = isUnapproved || this.__isRequestUnderReview(req) || 
+      const isApplicable = isUnapproved || this.__isRequestUnderReview(req) ||
         this.__hasConflicts(req) || this.__hasFailedPipeline(req)
 
       return isCompleted && hasPathsChanges && isApplicable
@@ -171,10 +177,11 @@ class Unapproved extends BaseCommand {
     ))
   }
 
-  __hasConflicts = req => this.__getConfigSetting("unapproved.checkConflicts", false) && req.has_conflicts
+  __hasConflicts = req => this.__getConfigSetting("unapproved.checkConflicts", false) &&
+    req.has_conflicts
 
-  __hasFailedPipeline = req => this.__getConfigSetting("unapproved.checkPipeline", false) && 
-    req.pipelines[0].status == "failed"
+  __hasFailedPipeline = req => this.__getConfigSetting("unapproved.checkPipeline", false) &&
+    req.pipelines[0].status == "failed" // eslint-disable-line eqeqeq
 
   __getExtendedRequests = projectId => {
     return this.gitlab
@@ -189,11 +196,16 @@ class Unapproved extends BaseCommand {
   }
 
   __getExtendedRequest = (project, request) => ["approvals", "changes", "discussions", "pipelines"]
-    .reduce((prev, field) => prev.then(req => this.__append(field)(project, req)), Promise.resolve(request)) 
+    .reduce(
+      (prev, field) => prev.then(req => this.__append(field)(project, req)),
+      Promise.resolve(request),
+    )
     .then(req => ({ ...req, project }))
 
   __append = field => (project, request) => this.gitlab[field](project.id, request.iid)
-    .then(result => (result instanceof Array ? ({ [field]: result, ...request }) : ({ ...result, ...request })))
+    .then(result => (result instanceof Array
+      ? ({ [field]: result, ...request })
+      : ({ ...result, ...request })))
 
   __getConfigSetting = (settingName, defaultValue = null) => {
     return _.get(this.config, settingName, defaultValue)
