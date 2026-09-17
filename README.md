@@ -110,6 +110,13 @@ into `7`, `7`, `7` and `6`.
 four slices above, 12 requests give two slices of `6`, and 7 requests are sent in one piece, with the
 message header left as usual. Anything above one slice adds a `(part N of M)` suffix to the header.
 
+A cycle always spans `slices` slots, whether or not every slot holds a slice. Slices fill the slots
+from the first one, and a slot left without a slice sends nothing at all — not even the "no pending
+requests" message. With `slices: 4`, `period: 1h` and `minRequests: 5`, five requests are announced
+once and the channel then stays quiet for three hours; twelve requests take two slots out of four; a
+queue long enough for four slices fills the cycle. The number of messages follows the size of the
+queue on its own.
+
 Slices are recomputed on every run rather than kept anywhere, so a full cycle covers everything as
 long as the list itself holds still. Once a request is merged, or its `updated_at` moves because its
 author pushed, everything behind it shifts by a position — a single request can then miss its turn in

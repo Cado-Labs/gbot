@@ -15,6 +15,7 @@ const PINNED_TYPES = ["conflicts", "pipeline_failed"]
 class Unapproved extends BaseCommand {
   __userNames = new Map()
   __batch = null
+  __skipRun = false
 
   perform = () => {
     return this.projects
@@ -37,6 +38,10 @@ class Unapproved extends BaseCommand {
 
   __buildMessages = requests => {
     const markup = markupUtils[this.__getConfigSetting("messenger.markup")]
+
+    if (this.__skipRun) {
+      return []
+    }
 
     if (requests.length) {
       return this.__buildListMessages(requests, markup)
@@ -143,13 +148,21 @@ class Unapproved extends BaseCommand {
     if (!this.__getConfigSetting("unapproved.batches.enabled", false)) return requests
 
     const period = this.__batchPeriod()
+    const slots = this.__positiveInteger("slices")
     const [pinnedRequests, rotatedRequests] = _.partition(requests, this.__isPinnedRequest)
-    const count = this.__sliceCount(rotatedRequests.length)
+    const count = this.__sliceCount(rotatedRequests.length, slots)
+    const index = Math.floor(Date.now() / period) % slots
+
+    if (index >= count) {
+      this.__skipRun = true
+      this.logger.info(`Slot ${index + 1} of ${slots} holds no slice, sending nothing`)
+
+      return []
+    }
 
     if (count < 2) return requests
 
     const slices = this.__sliceRequests(rotatedRequests, count)
-    const index = Math.floor(Date.now() / period) % count
     const selected = new Set([...pinnedRequests, ...slices[index]])
 
     this.__batch = { index, count }
@@ -158,11 +171,10 @@ class Unapproved extends BaseCommand {
     return requests.filter(request => selected.has(request))
   }
 
-  __sliceCount = total => {
-    const slices = this.__positiveInteger("slices")
+  __sliceCount = (total, slots) => {
     const minRequests = this.__positiveInteger("minRequests", 1)
 
-    return Math.max(1, Math.min(slices, Math.floor(total / minRequests)))
+    return Math.max(1, Math.min(slots, Math.floor(total / minRequests)))
   }
 
   __sliceRequests = (requests, count) => {
