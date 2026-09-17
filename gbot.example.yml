@@ -43,4 +43,5 @@ unapproved:
   batches:
     enabled: false
     period: 4h
-    maxRequests: 5
+    slices: 4
+    minRequests: 5
