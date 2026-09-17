@@ -89,37 +89,49 @@ unapproved:                            # Config for `unapproved` command
   requestsPerMessage: 15               # Merge requests count per message
   checkConflicts: false                # Whether to check PR conflicts
   checkPipeline: false                 # Whether to check if PR pipeline failed
-  batches:                             # Send requests in rotating batches instead of all at once (optional)
+  batches:                             # Send requests in rotating slices instead of all at once (optional)
     enabled: false                     # Whether batching is enabled (default - false)
-    period: 4h                         # Length of a single batch slot. Must match how often the bot
+    period: 4h                         # Length of a single slice slot. Must match how often the bot
                                        # is run (e.g. `4h` for a schedule firing every 4 hours)
-    maxRequests: 5                     # Maximum requests per batch
+    slices: 4                          # How many slices to split the list into
 ```
 
 ### Batches
 
 By default every run sends all pending requests at once, which nobody reads when the list gets long.
-With `unapproved.batches` the bot instead splits the list into `ceil(total / maxRequests)` batches and
-sends one of them per run, so the whole list is still covered over a full cycle. With 18 requests and
-`maxRequests: 5` that is 4 batches: `1-5`, `6-10`, `11-15`, `16-18`, then the cycle starts over.
+With `unapproved.batches` the bot instead splits the list into `slices` even parts and sends one of
+them per run, so the whole list is still covered over a full cycle. 27 requests over 4 slices are cut
+into `7`, `7`, `7` and `6`.
 
-Batches are recomputed on every run rather than kept anywhere, so a full cycle covers everything as
+A cycle always spans `slices` slots, whether or not every slot holds a slice. Slices are only limited
+by the queue itself — `min(slices, total)`, so they never come out empty — and they fill the slots
+from the first one. A slot left without a slice sends nothing at all, not even the "no pending
+requests" message. With `slices: 4` and `period: 1h`, three requests are announced one per hour over
+the first three slots and the fourth stays quiet; a queue of 27 fills every slot. The number of
+messages follows the size of the queue on its own. A run that carries more than one slice adds a
+`(part N of M)` suffix to the header.
+
+Slices are recomputed on every run rather than kept anywhere, so a full cycle covers everything as
 long as the list itself holds still. Once a request is merged, or its `updated_at` moves because its
 author pushed, everything behind it shifts by a position — a single request can then miss its turn in
-the current cycle or show up in two batches in a row. The next cycle sorts that out on its own.
+the current cycle or show up in two slices in a row. The next cycle sorts that out on its own.
 
-Requests are ordered by their last update time, so the stalest ones come first. The batch to send is
-derived from the current time — `floor(now / period) % batchesCount` — and no state is kept between
+Requests are ordered by their last update time, so the stalest ones come first. The slice to send is
+derived from the current time — `floor(now / period) % sliceCount` — and no state is kept between
 runs, which means **`period` must match the interval the bot is actually run at**. Otherwise the index
-skips: with `period: 1h` and a schedule firing every 4 hours it jumps by 4 every run, so some batches
-are never sent at all, and when the batch count happens to divide that step — 4 batches here — the bot
-re-sends the very same batch forever.
+skips: with `period: 1h` and a schedule firing every 4 hours it jumps by 4 every run, so some slices
+are never sent at all, and when the slice count happens to divide that step — 4 slices here — the bot
+re-sends the very same slice forever.
+
+A schedule that only covers working hours needs one more thing: pick `slices` to match the number of
+runs per day. Three runs a day with `slices: 3` close a cycle exactly once per day, whatever the list
+size. Pick a count that shares a divisor with the number of `period`-long slots in a day (6 slots for
+`period: 4h`) and some slices are never reached — `slices: 6` with three runs a day sends the same
+three slices forever.
 
 When `splitByReviewProgress` is enabled, the `With conflicts` and `With failed pipeline` sections are
-never batched: those are a call to action for the request author, so they are sent in full every run.
-Batches only apply to the `Unapproved` and `Under review` sections. If a cycle happens to contain just
-one batch (there are no more requests than `maxRequests`), the message header stays as usual,
-otherwise it gets a `(part N of M)` suffix.
+never sliced: those are a call to action for the request author, so they are sent in full every run.
+Slicing only applies to the `Unapproved` and `Under review` sections.
 
 Groups in the config are [Gitlab project groups](https://docs.gitlab.com/ee/user/group/). You must specify the group or the project, or both.
 

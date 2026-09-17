@@ -15,6 +15,7 @@ const PINNED_TYPES = ["conflicts", "pipeline_failed"]
 class Unapproved extends BaseCommand {
   __userNames = new Map()
   __batch = null
+  __skipRun = false
 
   perform = () => {
     return this.projects
@@ -37,6 +38,10 @@ class Unapproved extends BaseCommand {
 
   __buildMessages = requests => {
     const markup = markupUtils[this.__getConfigSetting("messenger.markup")]
+
+    if (this.__skipRun) {
+      return []
+    }
 
     if (requests.length) {
       return this.__buildListMessages(requests, markup)
@@ -142,30 +147,48 @@ class Unapproved extends BaseCommand {
   __selectBatch = requests => {
     if (!this.__getConfigSetting("unapproved.batches.enabled", false)) return requests
 
-    const batchSize = this.__batchSize()
     const period = this.__batchPeriod()
+    const slots = this.__positiveInteger("slices")
     const [pinnedRequests, rotatedRequests] = _.partition(requests, this.__isPinnedRequest)
+    const count = Math.min(slots, Math.max(rotatedRequests.length, 1))
+    const index = Math.floor(Date.now() / period) % slots
 
-    if (rotatedRequests.length <= batchSize) return requests
+    if (index >= count) {
+      this.__skipRun = true
+      this.logger.info(`Slot ${index + 1} of ${slots} holds no slice, sending nothing`)
 
-    const batches = _.chunk(rotatedRequests, batchSize)
-    const index = Math.floor(Date.now() / period) % batches.length
-    const selected = new Set([...pinnedRequests, ...batches[index]])
+      return []
+    }
 
-    this.__batch = { index, count: batches.length }
-    this.logger.info(`Sending batch ${index + 1} of ${batches.length}`)
+    if (count < 2) return requests
+
+    const slices = this.__sliceRequests(rotatedRequests, count)
+    const selected = new Set([...pinnedRequests, ...slices[index]])
+
+    this.__batch = { index, count }
+    this.logger.info(`Sending slice ${index + 1} of ${count}`)
 
     return requests.filter(request => selected.has(request))
   }
 
-  __batchSize = () => {
-    const size = this.__getConfigSetting("unapproved.batches.maxRequests")
+  __sliceRequests = (requests, count) => {
+    const size = Math.floor(requests.length / count)
+    const extra = requests.length % count
 
-    if (!_.isInteger(size) || size < 1) {
-      throw new Error("unapproved.batches.maxRequests must be a positive integer")
+    return _.range(count).map(index => {
+      const start = index * size + Math.min(index, extra)
+      return requests.slice(start, start + size + (index < extra ? 1 : 0))
+    })
+  }
+
+  __positiveInteger = setting => {
+    const value = this.__getConfigSetting(`unapproved.batches.${setting}`)
+
+    if (!_.isInteger(value) || value < 1) {
+      throw new Error(`unapproved.batches.${setting} must be a positive integer`)
     }
 
-    return size
+    return value
   }
 
   __batchPeriod = () => {
