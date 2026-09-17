@@ -94,8 +94,6 @@ unapproved:                            # Config for `unapproved` command
     period: 4h                         # Length of a single slice slot. Must match how often the bot
                                        # is run (e.g. `4h` for a schedule firing every 4 hours)
     slices: 4                          # How many slices to split the list into
-    minRequests: 5                     # Minimum requests per slice. A short list is split into fewer
-                                       # slices rather than into tiny ones (default - 1)
 ```
 
 ### Batches
@@ -105,17 +103,13 @@ With `unapproved.batches` the bot instead splits the list into `slices` even par
 them per run, so the whole list is still covered over a full cycle. 27 requests over 4 slices are cut
 into `7`, `7`, `7` and `6`.
 
-`minRequests` keeps short lists from being cut into scraps: the number of slices actually used is
-`min(slices, floor(total / minRequests))`. With `slices: 4` and `minRequests: 5`, 27 requests give the
-four slices above, 12 requests give two slices of `6`, and 7 requests are sent in one piece, with the
-message header left as usual. Anything above one slice adds a `(part N of M)` suffix to the header.
-
-A cycle always spans `slices` slots, whether or not every slot holds a slice. Slices fill the slots
-from the first one, and a slot left without a slice sends nothing at all — not even the "no pending
-requests" message. With `slices: 4`, `period: 1h` and `minRequests: 5`, five requests are announced
-once and the channel then stays quiet for three hours; twelve requests take two slots out of four; a
-queue long enough for four slices fills the cycle. The number of messages follows the size of the
-queue on its own.
+A cycle always spans `slices` slots, whether or not every slot holds a slice. Slices are only limited
+by the queue itself — `min(slices, total)`, so they never come out empty — and they fill the slots
+from the first one. A slot left without a slice sends nothing at all, not even the "no pending
+requests" message. With `slices: 4` and `period: 1h`, three requests are announced one per hour over
+the first three slots and the fourth stays quiet; a queue of 27 fills every slot. The number of
+messages follows the size of the queue on its own. A run that carries more than one slice adds a
+`(part N of M)` suffix to the header.
 
 Slices are recomputed on every run rather than kept anywhere, so a full cycle covers everything as
 long as the list itself holds still. Once a request is merged, or its `updated_at` moves because its

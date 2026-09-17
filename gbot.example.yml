@@ -44,4 +44,3 @@ unapproved:
     enabled: false
     period: 4h
     slices: 4
-    minRequests: 5

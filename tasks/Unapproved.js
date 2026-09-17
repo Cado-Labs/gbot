@@ -150,7 +150,7 @@ class Unapproved extends BaseCommand {
     const period = this.__batchPeriod()
     const slots = this.__positiveInteger("slices")
     const [pinnedRequests, rotatedRequests] = _.partition(requests, this.__isPinnedRequest)
-    const count = this.__sliceCount(rotatedRequests.length, slots)
+    const count = Math.min(slots, Math.max(rotatedRequests.length, 1))
     const index = Math.floor(Date.now() / period) % slots
 
     if (index >= count) {
@@ -171,12 +171,6 @@ class Unapproved extends BaseCommand {
     return requests.filter(request => selected.has(request))
   }
 
-  __sliceCount = (total, slots) => {
-    const minRequests = this.__positiveInteger("minRequests", 1)
-
-    return Math.max(1, Math.min(slots, Math.floor(total / minRequests)))
-  }
-
   __sliceRequests = (requests, count) => {
     const size = Math.floor(requests.length / count)
     const extra = requests.length % count
@@ -187,8 +181,8 @@ class Unapproved extends BaseCommand {
     })
   }
 
-  __positiveInteger = (setting, defaultValue = null) => {
-    const value = this.__getConfigSetting(`unapproved.batches.${setting}`, defaultValue)
+  __positiveInteger = setting => {
+    const value = this.__getConfigSetting(`unapproved.batches.${setting}`)
 
     if (!_.isInteger(value) || value < 1) {
       throw new Error(`unapproved.batches.${setting} must be a positive integer`)
