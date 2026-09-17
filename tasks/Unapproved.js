@@ -143,12 +143,13 @@ class Unapproved extends BaseCommand {
     if (!this.__getConfigSetting("unapproved.batches.enabled", false)) return requests
 
     const batchSize = this.__batchSize()
+    const period = this.__batchPeriod()
     const [pinnedRequests, rotatedRequests] = _.partition(requests, this.__isPinnedRequest)
 
     if (rotatedRequests.length <= batchSize) return requests
 
     const batches = _.chunk(rotatedRequests, batchSize)
-    const index = this.__currentBatchIndex(batches.length)
+    const index = Math.floor(Date.now() / period) % batches.length
     const selected = new Set([...pinnedRequests, ...batches[index]])
 
     this.__batch = { index, count: batches.length }
@@ -156,8 +157,6 @@ class Unapproved extends BaseCommand {
 
     return requests.filter(request => selected.has(request))
   }
-
-  __currentBatchIndex = count => Math.floor(Date.now() / this.__batchPeriod()) % count
 
   __batchSize = () => {
     const size = this.__getConfigSetting("unapproved.batches.maxRequests")

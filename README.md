@@ -103,11 +103,17 @@ With `unapproved.batches` the bot instead splits the list into `ceil(total / max
 sends one of them per run, so the whole list is still covered over a full cycle. With 18 requests and
 `maxRequests: 5` that is 4 batches: `1-5`, `6-10`, `11-15`, `16-18`, then the cycle starts over.
 
+Batches are recomputed on every run rather than kept anywhere, so a full cycle covers everything as
+long as the list itself holds still. Once a request is merged, or its `updated_at` moves because its
+author pushed, everything behind it shifts by a position — a single request can then miss its turn in
+the current cycle or show up in two batches in a row. The next cycle sorts that out on its own.
+
 Requests are ordered by their last update time, so the stalest ones come first. The batch to send is
 derived from the current time — `floor(now / period) % batchesCount` — and no state is kept between
-runs, which means **`period` must match the interval the bot is actually run at**. With `period: 1h`
-and a schedule firing every 4 hours the index would jump by 4 each run and only every fourth batch
-would ever be sent.
+runs, which means **`period` must match the interval the bot is actually run at**. Otherwise the index
+skips: with `period: 1h` and a schedule firing every 4 hours it jumps by 4 every run, so some batches
+are never sent at all, and when the batch count happens to divide that step — 4 batches here — the bot
+re-sends the very same batch forever.
 
 When `splitByReviewProgress` is enabled, the `With conflicts` and `With failed pipeline` sections are
 never batched: those are a call to action for the request author, so they are sent in full every run.
