@@ -40,3 +40,7 @@ unapproved:
   requestsPerMessage: 15
   checkConflicts: false
   checkPipeline: false
+  batches:
+    enabled: false
+    period: 4h
+    maxRequests: 5
