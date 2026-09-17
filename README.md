@@ -89,7 +89,31 @@ unapproved:                            # Config for `unapproved` command
   requestsPerMessage: 15               # Merge requests count per message
   checkConflicts: false                # Whether to check PR conflicts
   checkPipeline: false                 # Whether to check if PR pipeline failed
+  batches:                             # Send requests in rotating batches instead of all at once (optional)
+    enabled: false                     # Whether batching is enabled (default - false)
+    period: 4h                         # Length of a single batch slot. Must match how often the bot
+                                       # is run (e.g. `4h` for a schedule firing every 4 hours)
+    maxRequests: 5                     # Maximum requests per batch
 ```
+
+### Batches
+
+By default every run sends all pending requests at once, which nobody reads when the list gets long.
+With `unapproved.batches` the bot instead splits the list into `ceil(total / maxRequests)` batches and
+sends one of them per run, so the whole list is still covered over a full cycle. With 18 requests and
+`maxRequests: 5` that is 4 batches: `1-5`, `6-10`, `11-15`, `16-18`, then the cycle starts over.
+
+Requests are ordered by their last update time, so the stalest ones come first. The batch to send is
+derived from the current time — `floor(now / period) % batchesCount` — and no state is kept between
+runs, which means **`period` must match the interval the bot is actually run at**. With `period: 1h`
+and a schedule firing every 4 hours the index would jump by 4 each run and only every fourth batch
+would ever be sent.
+
+When `splitByReviewProgress` is enabled, the `With conflicts` and `With failed pipeline` sections are
+never batched: those are a call to action for the request author, so they are sent in full every run.
+Batches only apply to the `Unapproved` and `Under review` sections. If a cycle happens to contain just
+one batch (there are no more requests than `maxRequests`), the message header stays as usual,
+otherwise it gets a `(part N of M)` suffix.
 
 Groups in the config are [Gitlab project groups](https://docs.gitlab.com/ee/user/group/). You must specify the group or the project, or both.
 

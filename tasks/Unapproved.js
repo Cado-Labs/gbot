@@ -6,16 +6,21 @@ const UnapprovedRequestDescription = require("./unapproved/UnapprovedRequestDesc
 
 const logger = require("../utils/logger")
 const markupUtils = require("../utils/markup")
+const timeUtils = require("../utils/time")
 const userUtils = require("../utils/users")
 const { NetworkError } = require("../utils/errors")
 
+const PINNED_TYPES = ["conflicts", "pipeline_failed"]
+
 class Unapproved extends BaseCommand {
   __userNames = new Map()
+  __batch = null
 
   perform = () => {
     return this.projects
       .then(projects => Promise.all(projects.map(this.__getApplicableRequests)))
       .then(this.__sortRequests)
+      .then(this.__selectBatch)
       .then(this.__buildMessages)
       .then(this.__logMessages)
       .then(this.messenger.sendMany)
@@ -47,7 +52,7 @@ class Unapproved extends BaseCommand {
   }
 
   __buildListMessages = (requests, markup) => {
-    const headText = "Hey, there are a couple of requests waiting for your review"
+    const headText = this.__headText()
     const messages = this.__buildRequestsMessages(requests, markup)
     const header = markup.makeHeader(headText)
 
@@ -87,22 +92,7 @@ class Unapproved extends BaseCommand {
 
   __buildByReviewProgressMessages = (requests, markup) => {
     const messages = []
-    const [
-      toReviewRequests, underReviewRequests, reviewedWithConflicts, reviewedWithFailedPipeline,
-    ] = _.values(
-      _.groupBy(requests, req => {
-        switch (true) {
-          case req.approvals_left > 0 && !this.__isRequestUnderReview(req):
-            return 0 // To review
-          case this.__isRequestUnderReview(req):
-            return 1 // Under review
-          case this.__hasConflicts(req):
-            return 2 // Reviewed with conflicts
-          default:
-            return 3 // Reviewed with failed pipeline
-        }
-      }),
-    )
+    const groups = _.groupBy(requests, this.__reviewProgressType)
 
     const makeSection = _.flow(
       markup.makeBold,
@@ -111,20 +101,16 @@ class Unapproved extends BaseCommand {
     )
 
     const sections = [
-      { type: "unapproved", name: "Unapproved", requests: toReviewRequests },
-      { type: "under_review", name: "Under review", requests: underReviewRequests },
-      { type: "conflicts", name: "With conflicts", requests: reviewedWithConflicts },
-      {
-        type: "pipeline_failed",
-        name: "With failed pipeline",
-        requests: reviewedWithFailedPipeline,
-      },
+      { type: "unapproved", name: "Unapproved" },
+      { type: "under_review", name: "Under review" },
+      { type: "conflicts", name: "With conflicts" },
+      { type: "pipeline_failed", name: "With failed pipeline" },
     ]
 
     sections.forEach(settings => {
       const section = makeSection(settings.name)
       const sectionMessages = this.__buildGeneralRequestsMessages(
-        settings.type, settings.requests, markup,
+        settings.type, groups[settings.type] || [], markup,
       )
 
       sectionMessages.forEach((chunk, idx) => {
@@ -152,6 +138,72 @@ class Unapproved extends BaseCommand {
 
   __sortRequests = requests => requests
     .flat().sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at))
+
+  __selectBatch = requests => {
+    if (!this.__getConfigSetting("unapproved.batches.enabled", false)) return requests
+
+    const batchSize = this.__batchSize()
+    const [pinnedRequests, rotatedRequests] = _.partition(requests, this.__isPinnedRequest)
+
+    if (rotatedRequests.length <= batchSize) return requests
+
+    const batches = _.chunk(rotatedRequests, batchSize)
+    const index = this.__currentBatchIndex(batches.length)
+    const selected = new Set([...pinnedRequests, ...batches[index]])
+
+    this.__batch = { index, count: batches.length }
+    this.logger.info(`Sending batch ${index + 1} of ${batches.length}`)
+
+    return requests.filter(request => selected.has(request))
+  }
+
+  __currentBatchIndex = count => Math.floor(Date.now() / this.__batchPeriod()) % count
+
+  __batchSize = () => {
+    const size = this.__getConfigSetting("unapproved.batches.maxRequests")
+
+    if (!_.isInteger(size) || size < 1) {
+      throw new Error("unapproved.batches.maxRequests must be a positive integer")
+    }
+
+    return size
+  }
+
+  __batchPeriod = () => {
+    const period = this.__getConfigSetting("unapproved.batches.period")
+    const interval = _.isString(period) ? timeUtils.parseInterval(period) : 0
+
+    if (!interval) {
+      throw new Error("unapproved.batches.period must be an interval, such as 30m, 4h or 2d")
+    }
+
+    return interval
+  }
+
+  __isPinnedRequest = request =>
+    this.__getConfigSetting("unapproved.splitByReviewProgress", false) &&
+      PINNED_TYPES.includes(this.__reviewProgressType(request))
+
+  __reviewProgressType = request => {
+    switch (true) {
+      case request.approvals_left > 0 && !this.__isRequestUnderReview(request):
+        return "unapproved"
+      case this.__isRequestUnderReview(request):
+        return "under_review"
+      case this.__hasConflicts(request):
+        return "conflicts"
+      default:
+        return "pipeline_failed"
+    }
+  }
+
+  __headText = () => {
+    const text = "Hey, there are a couple of requests waiting for your review"
+
+    if (!this.__batch) return text
+
+    return `${text} (part ${this.__batch.index + 1} of ${this.__batch.count})`
+  }
 
   __getApplicableRequests = project => this.__getExtendedRequests(project.id)
     .then(requests => requests.filter(req => {
