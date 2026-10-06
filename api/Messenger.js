@@ -17,6 +17,8 @@ class Messenger {
       channel: this.channel,
       username: this.username,
       icon_url: this.icon,
+      unfurl_links: false,
+      unfurl_media: false,
     }
 
     return network.post(this.url, content, this.headers)
